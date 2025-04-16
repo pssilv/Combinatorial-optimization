@@ -1,0 +1,6 @@
+On the main() choose the instance and the tour file remember that the limit is 
+1000 nodes but you can adjust that.
+
+and then type: 
+gcc -o solver solver.c -lm
+./solver
