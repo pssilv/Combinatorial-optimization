@@ -30,3 +30,5 @@ https://www.sudokuwiki.org/Weekly-Sudoku.aspx
 
 Those are "unsolvable instances" and sudokuwiki solver can't solve those instances but my algorithm solved all 3 instances i tested, you can add more instances but
 you need to do a manual input because the site doesn't have a downloading option or at least i didn't see any.
+
+An additional detail is that for hard instances can take some time usually a few minutes to some hours to find the solution
