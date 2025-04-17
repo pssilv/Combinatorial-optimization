@@ -40,3 +40,6 @@ enough clues to decide where the mines are.
 
 The last thing i wanna say is if this algorithm can in fact beat all instances even the hard ones then P equals to NP and i could win 1 million dollars but the 
 rules to the solution being valid is annoying so enjoy this and try to create good things with the informations of this directory.
+
+Donate if you want:
+bitcoin:bc1ql7h7nlzewj7g6jaj9qv3x90mtwggudyjyx3m57hewh5cgw572fys4rwdpj
