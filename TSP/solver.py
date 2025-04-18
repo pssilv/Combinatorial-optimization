@@ -1,10 +1,105 @@
 import math
 import time
+import os
 
-from save_file import (
-    create_tour_file,
-    save_created_tour_file
-)
+#  Global variables
+MAX_RUNS = 5
+NAME = "bay29"
+FILEPATH = "TSP_instances/bayg29.tsp"
+OPT_FILEPATH = "TSP_instances/bayg29.opt.tour" #  Optional set to None if theres none.
+
+
+def parse_tsp_file(file_path):
+    coordinates = []
+
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
+        file.close()
+
+    node_coord_section = False
+
+    for line in lines:
+        line = line.strip()
+
+        if line == "NODE_COORD_SECTION":
+            node_coord_section = True
+            continue
+        if line == "EOF":
+            break
+
+        if node_coord_section:
+            parts = line.split()
+            if len(parts) >= 3:
+                x, y = round(float(parts[1])), round(float(parts[2]))
+                coordinates.append((x, y))
+
+    return coordinates
+
+
+def parse_tour_file(file_path):
+    if file_path is None:
+        return None
+
+    coordinates_points = []
+
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
+        file.close()
+
+    tour_section = False
+
+    for line in lines:
+        line = line.strip()
+
+        if line == "TOUR_SECTION":
+            tour_section = True
+            continue
+        if line == "-1":
+            break
+
+        if tour_section:
+            parts = line.split()
+            if len(parts) == 1:
+                point = int(parts[0]) - 1
+                coordinates_points.append(point)
+
+    return coordinates_points
+
+
+def create_tour_file():
+    counter = 1
+
+    while True:
+        filepath = f"TSP_results/{NAME}_{counter}.tour"
+        if not os.path.exists(filepath):
+            with open(filepath, "w") as file:
+                file.close()
+            break
+        else:
+            counter += 1
+
+    print(f"Tour file created in {filepath}")
+
+    return counter
+
+
+def update_tour_file(tour, dist, time, tourfile_number):
+    filepath = f"TSP_results/{NAME}_{tourfile_number}.tour"
+
+    with open(filepath, "w") as file:
+        file.write(f"NAME: {NAME}\n")
+        file.write(f"COMMENT: Tour length {dist}, total time {time} seconds\n")
+        file.write("TYPE: TOUR\n")
+        file.write(f"DIMENSION: {len(tour)}\n")
+        file.write("TOUR_SECTION\n")
+
+        for point in tour:
+            file.write(f"{point+1}\n")
+        file.write("-1\n")
+        file.write("EOF\n")
+        file.close()
+
+    print(f"Tour updated in {filepath}")
 
 
 def calculate_distance(p1, p2):
@@ -22,17 +117,20 @@ def calculate_tour_length(tour, processed_distances):
     return length
 
 
-def calculate_tour_distance(points, tour_set):
+def calculate_tour_distance(points, tour):
     total_distance = 0
 
-    for idx in range(len(tour_set) - 1):
-        initial_point = points[tour_set[idx]]
-        target_point = points[tour_set[idx + 1]]
+    for idx in range(len(tour) - 1):
+        point1 = tour[idx]
+        point2 = tour[idx + 1]
+
+        initial_point = points[point1]
+        target_point = points[point2]
 
         distance = calculate_distance(initial_point, target_point)
         total_distance += distance
 
-    total_distance += calculate_distance(points[tour_set[-1]], points[tour_set[0]])
+    total_distance += calculate_distance(points[tour[-1]], points[tour[0]])
 
     return total_distance
 
@@ -149,29 +247,52 @@ def nearest_neighbor(processed_distances, initial_point):
     return list(current_tour)
 
 
-def solve_tsp(points_position, instance_name="Undefined", runs=10):
+def solve_tsp(points):
     start = time.time()
-    processed_distances = pre_process(points_position)
+    processed_distances = pre_process(points)
     initial_point = 1
 
-    best_tour, shortest_dist = list(range(len(processed_distances))), float("inf")
-    filename = create_tour_file(best_tour, instance_name, shortest_dist, None)
+    best_tour = None
+    shortest_dist = float("inf")
 
-    while initial_point <= runs:
-        initial_tour = nearest_neighbor(processed_distances, initial_point)
+    tourfile_number = create_tour_file()
+
+    while initial_point <= MAX_RUNS:
+        print(f"current run: [{initial_point}], time: {round(time.time() - start, 2)} seconds")
         initial_point += 1
 
+        initial_tour = nearest_neighbor(processed_distances, initial_point)
         tour, dist = two_opt_and_swap(processed_distances, initial_tour)
-        print(f"current run: [{initial_point}], time: {round(time.time() - start, 2)} seconds")
 
         if dist < shortest_dist:
             shortest_dist = dist
             best_tour = tour
 
             print(f"New shortest dist: {shortest_dist}")
+            print("Saving tour...")
+            update_tour_file(best_tour, shortest_dist, round(time.time() - start, 2), tourfile_number)
+            print("Saved")
+        else:
+            update_tour_file(best_tour, shortest_dist, round(time.time() - start, 2), tourfile_number)
 
-        print("Saving tour...")
-        save_created_tour_file(initial_tour, filename, shortest_dist, round(time.time() - start, 2))
-        print("Saved")
+    print(f"Total time {round(time.time() - start, 2)} seconds")
 
     return best_tour, shortest_dist
+
+
+def main():
+    points = parse_tsp_file(FILEPATH)
+    opt_tour = parse_tour_file(OPT_FILEPATH)
+    opt_dist = 0
+    if opt_tour is not None:
+        opt_dist = calculate_tour_distance(points, opt_tour)
+    print(f"Optimal distance: {opt_dist}")
+
+    tour, dist = solve_tsp(points)
+
+    print(f"Optimal distance: {opt_dist}")
+    print(f"Best found distance: {dist}")
+
+
+if __name__ == "__main__":
+    main()

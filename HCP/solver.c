@@ -7,6 +7,8 @@
 
 #define MAX_NODES 1000
 #define MAX_NEIGHBORS 1000
+#define FILEPATH "HCP_instances/undefined.hcp"
+#define NAME "undefined"
 
 typedef struct {
     int* neighbors;
@@ -17,6 +19,20 @@ typedef struct {
     int* tour;
     int dist;
 } TourResult;
+
+Node* parse_hcp(const char* filename, int* num_nodes);
+void save_tour_file(const int* tour, int num_nodes, double time);
+int** generate_distance_matrix(Node* graph, int num_nodes);
+int calculate_tour_length(const int* tour, int n, int** distances);
+TourResult two_opt_swap(int** distances, const int* initial_tour, int n);
+int* two_opt_reverse(int** distances, const int* initial_tour, int n);
+TourResult two_opt_and_swap(int** distances, const int* initial_tour, int n);
+int* nearest_neighbor(int** distances, int n, int initial_point);
+bool validate_graph(Node* graph, int num_nodes);
+void free_graph(Node* graph, int num_nodes);
+void free_distances(int** distances, int num_nodes);
+void print_graph(Node* graph, int num_nodes);
+
 
 Node* parse_hcp(const char* filename, int* num_nodes) {
     FILE* file = fopen(filename, "r");
@@ -85,10 +101,9 @@ Node* parse_hcp(const char* filename, int* num_nodes) {
     return graph;
 }
 
-void save_tour_file(const int* tour, int num_nodes, const char* filename, const char* name) {
+void save_tour_file(const int* tour, int num_nodes, double time) {
     char filepath[256];
-    snprintf(filepath, sizeof(filepath), "HCP_results/%s", filename[0] == '\0' ? "undefined.tour" : filename);
-    if (!strstr(filepath, ".tour")) strcat(filepath, ".tour");
+    snprintf(filepath, sizeof(filepath), "HCP_results/%s.tour", NAME);
 
     FILE* f = fopen(filepath, "w");
     if (!f) {
@@ -96,11 +111,11 @@ void save_tour_file(const int* tour, int num_nodes, const char* filename, const 
         return;
     }
 
-    fprintf(f, "NAME : %s\n", name[0] == '\0' ? "Undefined" : name);
-    fprintf(f, "TYPE : HCP TOUR\n");
-    fprintf(f, "COMMENT : %d-node graph\n", num_nodes);
-    fprintf(f, "DIMENSION : %d\n", num_nodes);
-    fprintf(f, "EDGE_DATA_FORMAT : EDGE_LIST\n");
+    fprintf(f, "NAME: %s\n", NAME);
+    fprintf(f, "TYPE: HCP TOUR\n");
+    fprintf(f, "COMMENT: %d-node graph, total time %.2f seconds\n", num_nodes, time);
+    fprintf(f, "DIMENSION: %d\n", num_nodes);
+    fprintf(f, "EDGE_DATA_FORMAT: EDGE_LIST\n");
     fprintf(f, "EDGE_DATA_SECTION\n");
     for (int i = 0; i < num_nodes; i++) fprintf(f, "%d\n", tour[i] + 1);
     fprintf(f, "-1\nEOF\n");
@@ -108,56 +123,7 @@ void save_tour_file(const int* tour, int num_nodes, const char* filename, const 
     printf("Tour saved to %s\n", filepath);
 }
 
-Node* create_hamiltonian_graph_guaranteed(int* num_nodes, int** hamiltonian_cycle) {
-    *num_nodes = 100;
-    Node* graph = calloc(*num_nodes, sizeof(Node));
-    int* nodes = malloc(*num_nodes * sizeof(int));
-    for (int i = 0; i < *num_nodes; i++) {
-        nodes[i] = i;
-        graph[i].neighbors = malloc(MAX_NEIGHBORS * sizeof(int));
-        graph[i].num_neighbors = 0;
-    }
-
-    srand(time(NULL));
-    for (int i = *num_nodes - 1; i > 0; i--) {
-        int j = rand() % (i + 1);
-        int temp = nodes[i];
-        nodes[i] = nodes[j];
-        nodes[j] = temp;
-    }
-
-    for (int i = 0; i < *num_nodes; i++) {
-        int u = nodes[i], v = nodes[(i + 1) % *num_nodes];
-        graph[u].neighbors[graph[u].num_neighbors++] = v;
-        graph[v].neighbors[graph[v].num_neighbors++] = u;
-    }
-
-    *hamiltonian_cycle = malloc((*num_nodes + 1) * sizeof(int));
-    memcpy(*hamiltonian_cycle, nodes, *num_nodes * sizeof(int));
-    (*hamiltonian_cycle)[*num_nodes] = nodes[0];
-
-    for (int u = 0; u < *num_nodes; u++) {
-        for (int v = u + 1; v < *num_nodes; v++) {
-            bool exists = false;
-            for (int k = 0; k < graph[u].num_neighbors; k++) {
-                if (graph[u].neighbors[k] == v) {
-                    exists = true;
-                    break;
-                }
-            }
-            if (!exists && (rand() % 10000) < 100) {
-                if (graph[u].num_neighbors < MAX_NEIGHBORS && graph[v].num_neighbors < MAX_NEIGHBORS) {
-                    graph[u].neighbors[graph[u].num_neighbors++] = v;
-                    graph[v].neighbors[graph[v].num_neighbors++] = u;
-                }
-            }
-        }
-    }
-    free(nodes);
-    return graph;
-}
-
-int** HC_to_TSP(Node* graph, int num_nodes) {
+int** generate_distance_matrix(Node* graph, int num_nodes) {
     int** distances = malloc(num_nodes * sizeof(int*));
     for (int i = 0; i < num_nodes; i++) {
         distances[i] = malloc(num_nodes * sizeof(int));
@@ -173,7 +139,7 @@ int** HC_to_TSP(Node* graph, int num_nodes) {
             for (int k = 0; k < graph[i].num_neighbors; k++) {
                 if (graph[i].neighbors[k] == j) {
                     adjacent = true;
-                    break;
+  break;
                 }
             }
             distances[i][j] = adjacent ? 1 : 2;
@@ -342,7 +308,6 @@ int* nearest_neighbor(int** distances, int n, int initial_point) {
         }
     }
 
-    // Print tour
     printf("[");
     for (int i = 0; i < n; i++) {
         printf("%d", tour[i]);
@@ -354,13 +319,18 @@ int* nearest_neighbor(int** distances, int n, int initial_point) {
     return tour;
 }
 
-bool is_graph_valid(Node* graph, int num_nodes) {
+bool validate_graph(Node* graph, int num_nodes) {
     for (int i = 0; i < num_nodes; i++) {
         if (graph[i].num_neighbors == 0) {
             printf("Error: node %d is isolated.\n", i);
             return false;
         }
         for (int j = 0; j < graph[i].num_neighbors; j++) {
+            if (graph[i].neighbors[j] == i) {
+              printf("Error: node %d have himself as neighbor.", i+1); 
+              return false;
+            }
+
             int neighbor = graph[i].neighbors[j];
             bool found = false;
             for (int k = 0; k < graph[neighbor].num_neighbors; k++) {
@@ -370,7 +340,7 @@ bool is_graph_valid(Node* graph, int num_nodes) {
                 }
             }
             if (!found) {
-                printf("Error: connection between %d and %d isn't valid\n", i, neighbor);
+                printf("Error: connection between %d and %d is not bidirectional\n", i, neighbor);
                 return false;
             }
         }
@@ -405,37 +375,20 @@ void print_graph(Node* graph, int num_nodes) {
     printf("}\n");
 }
 
-int main() {
-    srand(time(NULL));
-    int num_nodes;
-    Node* graph = parse_hcp("HCP_instances/150_hard.hcp", &num_nodes);
-    if (!graph) {
-        printf("Failed to parse HCP file.\n");
-        return 1;
-    }
-
-    if (!is_graph_valid(graph, num_nodes)) {
-        free_graph(graph, num_nodes);
-        return 1;
-    }
-
-    printf("%d\n", num_nodes);
-    print_graph(graph, num_nodes);
-
-    int** distances = HC_to_TSP(graph, num_nodes);
+TourResult solve_hcp(Node* graph, int num_nodes) {
+    clock_t start = clock();
+    int** distances = generate_distance_matrix(graph, num_nodes);
+    int initial_point = 2;
 
     int* best_tour = NULL;
     int shortest_dist = INT_MAX;
-    int counter = 2;
-    clock_t start = clock();
 
-    while (counter < num_nodes) {
-        double time_elapsed = (double)(clock() - start) / CLOCKS_PER_SEC;
-        printf("Runs: %d, time: %.2f\n", counter, time_elapsed);
-        int* initial_tour = nearest_neighbor(distances, num_nodes, counter);
-        counter++;
+    while (initial_point < num_nodes) {
+        printf("Runs: %d, time: %.2f\n", initial_point - 1, (double)(clock() - start) / CLOCKS_PER_SEC);
 
+        int* initial_tour = nearest_neighbor(distances, num_nodes, initial_point);
         TourResult result = two_opt_and_swap(distances, initial_tour, num_nodes);
+
         free(initial_tour);
         if (result.dist < shortest_dist) {
             if (best_tour) free(best_tour);
@@ -445,22 +398,50 @@ int main() {
         } else {
             free(result.tour);
         }
+
+        initial_point++;
     }
 
-    printf("best dist: %d\n", shortest_dist);
-    printf("min dist: %d\n", num_nodes);
     printf("[");
     for (int i = 0; i < num_nodes; i++) {
         printf("%d", best_tour[i]);
         if (i < num_nodes - 1) printf(", ");
     }
     printf("]\n");
-    printf("Total time: %.2f seconds\n", (double)(clock() - start) / CLOCKS_PER_SEC);
-    printf("-------\n");
 
-    save_tour_file(best_tour, num_nodes, "150_hard", "150_hard");
-    free(best_tour);
+    printf("Saving result...\n");
+    save_tour_file(best_tour, num_nodes, (double)(clock() - start) / CLOCKS_PER_SEC);
+    printf("Saved.\n");
+
+    printf("Total time: %.2f seconds\n", (double)(clock() - start) / CLOCKS_PER_SEC);
+
     free_distances(distances, num_nodes);
+    TourResult result = {best_tour, shortest_dist};
+    return result;
+
+}
+
+int main() {
+    int num_nodes;
+    Node* graph = parse_hcp(FILEPATH, &num_nodes);
+    if (!graph) {
+        printf("Failed to parse HCP file.\n");
+        return 1;
+    }
+
+    if (!validate_graph(graph, num_nodes)) {
+        free_graph(graph, num_nodes);
+        return 1;
+    }
+
+    TourResult result = solve_hcp(graph, num_nodes);
+    int* tour = result.tour;
+    int dist = result.dist;
+
+    printf("best dist: %d\n", dist);
+    printf("min dist: %d\n", num_nodes);
+
+    free(tour);
     free_graph(graph, num_nodes);
     return 0;
 }

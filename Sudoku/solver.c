@@ -10,6 +10,8 @@
 #define SQRT_N 3     // Square root of N (3 for 9x9)
 #define MAX_RUNS 500 // Maximum number of variations
 #define MIN_COST (N * N * 3) // Minimum cost for perfect solution
+#define FILEPATH "Sudoku_instances/april_5_2025.txt" // Filepath to the instance
+#define NAME "april_5_2025" // Name of solution file
 
 // Structure for a cell
 typedef struct {
@@ -41,6 +43,17 @@ int tour[N][N];
 int best_tour[N][N];
 Subgraphs subgraphs;
 
+void parse_sudoku_file(const char *file_path);
+void save_sudoku_file(double time);
+void generate_cell_matrix();
+void generate_subgraphs();
+bool validate_sudoku(int sudoku[N][N]);
+int calculate_global_cost(int tour[N][N]);
+void generate_greedy_tour(int tour[N][N], Cell specific_cell, int specific_number);
+void two_opt_reverse(int tour[N][N], Cell *cells, int n, int temp_tour[N][N]);
+int two_opt(int tour[N][N], Cell *cells, int n, int temp_tour[N][N]);
+int two_opt_and_swap(int tour[N][N]);
+
 // Function to read the Sudoku from a file
 void parse_sudoku_file(const char *file_path) {
     FILE *file = fopen(file_path, "r");
@@ -63,18 +76,9 @@ void parse_sudoku_file(const char *file_path) {
 }
 
 // Function to save the solved Sudoku
-void save_sudoku_file(const char *filename) {
+void save_sudoku_file(double time) {
     char output_path[256];
-    snprintf(output_path, sizeof(output_path), "sudoku_results/%s", filename);
-
-    // Add "_solution.txt" to the filename
-    char *dot = strrchr(output_path, '.');
-    if (dot && strcmp(dot, ".txt") == 0) {
-        *dot = '\0';  // Remove ".txt"
-        strcat(output_path, "_solution.txt");
-    } else {
-        strcat(output_path, "_solution.txt");
-    }
+    snprintf(output_path, sizeof(output_path), "Sudoku_results/%s_solution.txt", NAME);
 
     FILE *file = fopen(output_path, "w");
     if (!file) {
@@ -90,8 +94,9 @@ void save_sudoku_file(const char *filename) {
         fprintf(file, "\n");
     }
 
+    fprintf(file, "\ntotal time %.2f seconds", time);
     fclose(file);
-    printf("Sudoku saved to %s\n", output_path);
+    printf("Result saved in %s\n", output_path);
 }
 
 // Function to copy sudoku to cell_matrix
@@ -486,7 +491,7 @@ int two_opt_and_swap(int tour[N][N]) {
 
 // Function for combinatorial optimization
 void solve_sudoku(int runs) {
-    time_t start = time(NULL);
+    clock_t start = clock();
     Cell cell_variations[MAX_RUNS];
     int number_variations[MAX_RUNS];
     int counter = 0;
@@ -512,7 +517,7 @@ void solve_sudoku(int runs) {
         Cell specific_cell = cell_variations[run];
         int specific_number = number_variations[run];
         printf("Run: %d\n", run + 1);
-        printf("%.2f seconds\n", difftime(time(NULL), start));
+        printf("%.2f seconds\n", (double)(clock() - start) / CLOCKS_PER_SEC);
         printf("(%d,%d) %d\n", specific_cell.row, specific_cell.col, specific_number);
 
         generate_greedy_tour(tour, specific_cell, specific_number);
@@ -528,8 +533,7 @@ void solve_sudoku(int runs) {
         }
     }
 
-    time_t end = time(NULL);
-    printf("\nTotal time: %.2f seconds\n", difftime(end, start));
+    // Print the result
     printf("Tour: \n");
     for (int i = 0; i < N; i++) {
         if (i % SQRT_N == 0 && i != 0) {
@@ -543,22 +547,20 @@ void solve_sudoku(int runs) {
         }
         printf("\n");
     }
+
+    // Save the solution
+    printf("Saving result...\n");    
+    save_sudoku_file((double)(clock() - start)/ CLOCKS_PER_SEC);
+    printf("Saved.\n"); 
+
+    printf("\nTotal time: %.2f seconds\n", (double)(clock() - start) / CLOCKS_PER_SEC);
     printf("Lowest cost: %d\n", lowest_cost);
 }
 
 // Main function
 int main() {
-    const char *instance_name = "sudoku_instances/april_5_2025.txt";
-    char filename[256];
-    const char *slash = strrchr(instance_name, '/');
-    if (slash) {
-        strcpy(filename, slash + 1);
-    } else {
-        strcpy(filename, instance_name);
-    }
-
     // Read the Sudoku from the file
-    parse_sudoku_file(instance_name);
+    parse_sudoku_file(FILEPATH);
 
     // Initialize numbers
     for (int i = 0; i < N; i++) {
@@ -583,9 +585,6 @@ int main() {
 
     // Execute optimization
     solve_sudoku(MAX_RUNS);
-
-    // Save the solution
-    save_sudoku_file(filename);
 
     return 0;
 }

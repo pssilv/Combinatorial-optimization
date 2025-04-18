@@ -7,10 +7,13 @@
 #include <limits.h>
 
 #define MAX_NODES 1000
-#define MAX_FILENAME 256
+#define MAX_RUNS 5
+#define NAME "xqf131"
+#define FILEPATH "TSP_instances/xqf131.tsp"
+#define OPT_FILEPATH "TSP_instances/xqf131.tour" // Optional set to NULL if theres none.
 
 typedef struct {
-    int x, y;
+    long long int x, y; // int may be small for some coordinates
 } Point;
 
 typedef struct {
@@ -25,8 +28,8 @@ typedef struct {
 
 Point* parse_tsp_file(const char* file_path, int* num_points);
 int* parse_tour_file(const char* file_path, int* num_points);
-void save_tour_file(const int* tour, int num_nodes, const char* name, int dist, double time, char* filename);
-void update_tour_file(const int* tour, int num_nodes, const char* filename, int dist, double time);
+int create_tour_file();
+void update_tour_file(const int* tour, int num_nodes, int dist, double time, int tourfile_number);
 int** pre_process(Point* points, int num_points);
 int calculate_distance(Point p1, Point p2);
 int calculate_tour_length(const int* tour, int n, int** distances);
@@ -94,7 +97,6 @@ Point* parse_tsp_file(const char* file_path, int* num_points) {
 int* parse_tour_file(const char* file_path, int* num_points) {
     FILE* file = fopen(file_path, "r");
     if (!file) {
-        printf("Error: Unable to open file %s\n", file_path);
         return NULL;
     }
 
@@ -129,56 +131,51 @@ int* parse_tour_file(const char* file_path, int* num_points) {
         }
     }
 
-    *num_points = count;
     fclose(file);
     return tour;
 }
 
-void save_tour_file(const int* tour, int num_nodes, const char* name, int dist, double time, char* filename) {
+int create_tour_file() {
     int counter = 1;
-    snprintf(filename, MAX_FILENAME, "TSP_results/%s_%d.tour", name, counter);
+    char filepath[256];
+    snprintf(filepath, sizeof(filepath), "TSP_results/%s_%d.tour", NAME, counter); 
 
-    while (fopen(filename, "r")) {
+    while (fopen(filepath, "r")) {
         counter++;
-        snprintf(filename, MAX_FILENAME, "TSP_results/%s_%d.tour", name, counter);
+        snprintf(filepath, sizeof(filepath), "TSP_results/%s_%d.tour", NAME, counter);
     }
 
-    FILE* f = fopen(filename, "w");
+    FILE* f = fopen(filepath, "w");
     if (!f) {
-        printf("Error: Unable to create file %s\n", filename);
-        return;
+        printf("Error: Unable to create file %s\n", filepath);
+        return 0;
     }
 
-    fprintf(f, "NAME: %s_%d.tour\n", name, counter);
-    fprintf(f, "COMMENT: Tour length %d, time %.2f\n", dist, time);
-    fprintf(f, "TYPE: TOUR\n");
-    fprintf(f, "DIMENSION: %d\n", num_nodes);
-    fprintf(f, "TOUR_SECTION\n");
-    for (int i = 0; i < num_nodes; i++) fprintf(f, "%d\n", tour[i] + 1);
-    fprintf(f, "-1\nEOF\n");
     fclose(f);
-    printf("Tour saved to %s\n", filename);
+    printf("Tour file created in %s\n", filepath);
+
+    return counter;
 }
 
-void update_tour_file(const int* tour, int num_nodes, const char* filename, int dist, double time) {
-    FILE* f = fopen(filename, "w");
+void update_tour_file(const int* tour, int num_nodes, int dist, double time, int tourfile_number) {
+    char filepath[256];
+    snprintf(filepath, sizeof(filepath), "TSP_results/%s_%d.tour", NAME, tourfile_number);
+
+    FILE* f = fopen(filepath, "w");
     if (!f) {
-        printf("Error: Unable to update file %s\n", filename);
+        printf("Error: Unable to update file %s\n", filepath);
         return;
     }
 
-    const char* name = strrchr(filename, '/');
-    name = name ? name + 1 : filename;
-
-    fprintf(f, "NAME: %s\n", name);
-    fprintf(f, "COMMENT: Tour length %d, time %.2f seconds\n", dist, time);
+    fprintf(f, "NAME: %s\n", NAME);
+    fprintf(f, "COMMENT: Tour length %d, total time %.2f seconds\n", dist, time);
     fprintf(f, "TYPE: TOUR\n");
     fprintf(f, "DIMENSION: %d\n", num_nodes);
     fprintf(f, "TOUR_SECTION\n");
     for (int i = 0; i < num_nodes; i++) fprintf(f, "%d\n", tour[i] + 1);
     fprintf(f, "-1\nEOF\n");
     fclose(f);
-    printf("Tour updated in %s\n", filename);
+    printf("Tour updated in %s\n", filepath);
 }
 
 int calculate_distance(Point p1, Point p2) {
@@ -388,41 +385,41 @@ void free_distances(int** distances, int num_points) {
     free(distances);
 }
 
-TourResult solve_tsp(Point* points, int num_points, const char* instance_name) {
+TourResult solve_tsp(Point* points, int num_points) { 
     clock_t start = clock();
     int** distances = pre_process(points, num_points);
     int initial_point = 1;
-    int runs = 10;
 
-    int* best_tour = malloc(num_points * sizeof(int));
-    for (int i = 0; i < num_points; i++) best_tour[i] = i;
+    int* best_tour = NULL;
     int shortest_dist = INT_MAX;
-    char filename[MAX_FILENAME];
 
-    save_tour_file(best_tour, num_points, instance_name, shortest_dist, 0.0, filename);
+    int tourfile_number = create_tour_file();
 
-    while (initial_point <= runs) {
-        double time_elapsed = (double)(clock() - start) / CLOCKS_PER_SEC;
+    while (initial_point <= MAX_RUNS) {
+        printf("current run: [%d], time: %.2f seconds\n", initial_point, (double)(clock() - start) / CLOCKS_PER_SEC);
+
         int* initial_tour = nearest_neighbor(distances, num_points, initial_point);
-        initial_point++;
-
         TourResult result = two_opt_and_swap(distances, initial_tour, num_points);
-        printf("current run: [%d], time: %.2f seconds\n", initial_point, time_elapsed);
-        free(initial_tour);
 
+        free(initial_tour);
         if (result.dist < shortest_dist) {
-            shortest_dist = result.dist;
-            free(best_tour);
+            if (best_tour) free(best_tour);
             best_tour = result.tour;
+            shortest_dist = result.dist;
             printf("New shortest dist: %d\n", shortest_dist);
+            printf("Saving tour...\n");
+            update_tour_file(best_tour, num_points, shortest_dist, (double)(clock() - start) / CLOCKS_PER_SEC, tourfile_number);
+            printf("Saved\n");
         } else {
             free(result.tour);
+            update_tour_file(best_tour, num_points, shortest_dist, (double)(clock() - start) / CLOCKS_PER_SEC, tourfile_number);
         }
 
-        printf("Saving tour...\n");
-        update_tour_file(best_tour, num_points, filename, shortest_dist, time_elapsed);
-        printf("Saved\n");
+        initial_point++;
     }
+
+
+    printf("Total time: %.2f seconds\n", (double)(clock() - start) / CLOCKS_PER_SEC);
 
     free_distances(distances, num_points);
     TourResult result = {best_tour, shortest_dist};
@@ -430,35 +427,23 @@ TourResult solve_tsp(Point* points, int num_points, const char* instance_name) {
 }
 
 int main() {
-    const char* tsp_filepath = "TSP_instances/ch130.tsp";
     int num_points;
-    Point* tsp_points = parse_tsp_file(tsp_filepath, &num_points);
+    Point* tsp_points = parse_tsp_file(FILEPATH, &num_points);
     if (!tsp_points) {
-        printf("Failed to parse TSP file %s\n", tsp_filepath);
+        printf("Failed to parse TSP file %s\n", FILEPATH);
         return 1;
     }
-
-    const char* tsp_tour_filepath = "TSP_instances/ch130.opt.tour";
     int opt_num_points;
-    int* opt_tour = parse_tour_file(tsp_tour_filepath, &opt_num_points);
-    if (!opt_tour) {
-        printf("Failed to parse tour file %s\n", tsp_tour_filepath);
-        free(tsp_points);
-        return 1;
+    int* opt_tour = parse_tour_file(OPT_FILEPATH, &opt_num_points);
+    int opt_dist = 0;
+    if (opt_tour != NULL) {
+        opt_dist = calculate_tour_distance(tsp_points, opt_tour, num_points);
     }
+    printf("Optimal distance: %d\n", opt_dist);
 
-    char instance_name[256];
-    const char* basename = strrchr(tsp_filepath, '/');
-    basename = basename ? basename + 1 : tsp_filepath;
-    strncpy(instance_name, basename, sizeof(instance_name));
-    char* dot = strrchr(instance_name, '.');
-    if (dot) *dot = '\0';
-
-    TourResult result = solve_tsp(tsp_points, num_points, instance_name);
+    TourResult result = solve_tsp(tsp_points, num_points);
     int* tour = result.tour;
     int dist = result.dist;
-
-    int opt_dist = calculate_tour_distance(tsp_points, opt_tour, opt_num_points);
 
     printf("Optimal distance: %d\n", opt_dist);
     printf("Best found distance: %d\n", dist);

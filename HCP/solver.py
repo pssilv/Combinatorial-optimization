@@ -1,37 +1,71 @@
-import random
 import time
 
-from parse_hcp import (
-    parse_hcp
-)
-
-from save_file import (
-    save_tour_file
-)
+# Global variables
+FILEPATH = "HCP_instances/undefined.hcp"
+NAME = "undefined"
 
 
-def create_hamiltonian_graph_guaranteed():
-    num_nodes = random.randint(100, 100)
-    graph = {i: [] for i in range(num_nodes)}
+def parse_hcp(file_content):
+    with open(file_content, 'r') as file:
+        file_content = file.read()
+        file.close()
 
-    nodes = list(range(num_nodes))
-    random.shuffle(nodes)
-    for i in range(num_nodes):
-        u, v = nodes[i], nodes[(i + 1) % num_nodes]
-        graph[u].append(v)
-        graph[v].append(u)
-    hamiltonian_cycle = nodes + [nodes[0]]
+    graph = {}
+    edge_data_section = False
 
-    for u in range(num_nodes):
-        for v in range(u + 1, num_nodes):
-            if v not in graph[u] and random.random() < 0.01:
-                graph[u].append(v)
-                graph[v].append(u)
+    for line in file_content.splitlines():
+        line = line.strip()
 
-    return graph, hamiltonian_cycle
+        if line.startswith("EDGE_DATA_SECTION"):
+            edge_data_section = True
+            continue
+
+        if line == "-1":
+            break
+
+        if edge_data_section:
+            parts = line.split()
+            if len(parts) == 2:
+                u = int(parts[0])
+                v = int(parts[1])
+
+                if u not in graph:
+                    graph[u] = []
+                if v not in graph:
+                    graph[v] = []
+
+                if v not in graph[u]:
+                    graph[u].append(v)
+                if u not in graph[v]:
+                    graph[v].append(u)
+
+    return graph
 
 
-def HC_to_TSP(graph):
+# Save a solution in TSBLIB format.
+def save_tour_file(tour, time):
+    filepath = f"HCP_results/{NAME}.tour"
+    num_nodes = len(tour)
+
+    with open(filepath, "w") as f:
+        f.write(f"NAME : {NAME}\n")
+        f.write("TYPE : HCP TOUR\n")
+        f.write(f"COMMENT : {num_nodes}-node graph, total time {time} seconds\n")
+        f.write(f"DIMENSION : {num_nodes}\n")
+        f.write("EDGE_DATA_FORMAT : EDGE_LIST\n")
+        f.write("EDGE_DATA_SECTION\n")
+
+        for node in tour:
+            f.write(f"{node}\n")
+
+        f.write("-1\n")
+        f.write("EOF\n")
+        f.close()
+
+    print(f"Result saved in {filepath}")
+
+
+def generate_distance_matrix(graph):
     processed_distances = {}
 
     for idx in graph:
@@ -170,45 +204,37 @@ def nearest_neighbor(processed_distances, initial_point):
     return list(current_tour)
 
 
-def is_graph_valid(graph):
-    for node, neighbors in graph.items():
-        if not neighbors:
+def validate_graph(graph):
+    for node in graph:
+        if len(graph[node]) == 0:
             print(f"Error: node {node} is isolated.")
             return False
 
-    for node, neighbors in graph.items():
-        for neighbor in neighbors:
-            if node not in graph.get(neighbor, []):
-                print(f"Error: connection between {node} and {neighbor} isn't valid")
+        if node in graph[node]:
+            print(f"Error: node {node} have himself as neighbor.")
+            return False
+
+        for neighbor in graph[node]:
+            if node not in graph[neighbor]:
+                print(f"Error: connection between {node} and {neighbor} is not bidirectional")
                 return False
 
     print("Graph looks valid.")
     return True
 
 
-def main():
-    graph = parse_hcp("HCP_instances/undefined.hcp")
-
-    is_valid = is_graph_valid(graph)
-
-    if is_valid is False:
-        return
-
-    print(len(graph))
-    print(graph)
-
-    processed_distances = HC_to_TSP(graph)
-
-    best_tour, shortest_dist = None, float("inf")
-
-    counter = 2
+def solve_HCP(graph):
     start = time.time()
-    while counter < len(graph):
-        print(f"Runs: {counter}, time: {round(time.time() - start, 2)}")
-        initial_tour = nearest_neighbor(processed_distances, counter)
-        counter += 1
+    processed_distances = generate_distance_matrix(graph)
+    best_tour, shortest_dist = None, float("inf")
+    initial_point = 2
 
+    while initial_point < len(graph):
+        print(f"Runs: {initial_point - 1}, time: {round(time.time() - start, 2)}")
+
+        initial_tour = nearest_neighbor(processed_distances, initial_point)
         tour, dist = two_opt_and_swap(processed_distances, initial_tour)
+
         if dist < shortest_dist:
             shortest_dist = dist
             best_tour = tour
@@ -216,13 +242,29 @@ def main():
             if shortest_dist == len(processed_distances):
                 break
 
-    print(f"best dist: {shortest_dist}")
-    print(f"min dist: {len(tour)}")
-    print(best_tour)
-    print(f"Total time {round(time.time() - start, 2)} seconds")
-    print("-------")
+        initial_point += 1
 
-    save_tour_file(tour)
+    print(best_tour)
+
+    print("Saving result...")
+    save_tour_file(tour, round(time.time() - start, 2))
+    print("Saved.")
+
+    print(f"Total time {round(time.time() - start, 2)} seconds")
+
+    return best_tour, shortest_dist
+
+
+def main():
+    graph = parse_hcp(FILEPATH)
+
+    if not validate_graph(graph):
+        return
+
+    best_tour, shortest_dist = solve_HCP(graph)
+
+    print(f"best dist: {shortest_dist}")
+    print(f"min dist: {len(graph)}")
 
 
 if __name__ == "__main__":

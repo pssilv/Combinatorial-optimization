@@ -1,6 +1,15 @@
 import tkinter as tk
 import time
 
+from solver import (
+    parse_tsp_file,
+    parse_tour_file
+)
+
+
+FILEPATH = "TSP_instances/xqf131.tsp"
+TOUR_FILEPATH = "TSP_results/xqf131_1.tour"
+
 
 def generate_canvas(points, tour):
     root = tk.Tk()
@@ -35,14 +44,18 @@ def connect_points(canvas, point_1, point_2, color=None, size=None):
                        fill=color, width=size)
 
 
-def make_tour(canvas, points, tour_set):
-    for idx in range(len(tour_set) - 1):
-        initial_point = points[tour_set[idx]]
-        target_point = points[tour_set[idx + 1]]
+def make_tour(canvas, points, tour):
+    for idx in range(len(tour) - 1):
+        point1 = tour[idx]
+        point2 = tour[idx + 1]
+
+        initial_point = points[point1]
+        target_point = points[point2]
+
         connect_points(canvas, initial_point, target_point, color="red", size=3)
         update_tkinter(canvas)
 
-    connect_points(canvas, points[tour_set[-1]], points[tour_set[0]], color="red", size=3)
+    connect_points(canvas, points[tour[-1]], points[tour[0]], color="red", size=3)
 
 
 def generate_tsp_points(canvas, points):
@@ -76,3 +89,13 @@ def generate_tsp_points(canvas, points):
         y = points[idx][1] * scale + offset_y
         points[idx] = (x, y)
         canvas.create_oval(x - 5, y - 5, x + 5, y + 5, fill="blue")
+
+
+def main():
+    points = parse_tsp_file(FILEPATH)
+    tour = parse_tour_file(TOUR_FILEPATH)
+    generate_canvas(points, tour)
+
+
+if __name__ == "__main__":
+    main()

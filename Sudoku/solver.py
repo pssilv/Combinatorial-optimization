@@ -1,13 +1,47 @@
 import time
 import math
 
-from parse_sudoku import (
-    parse_sudoku_file
-)
+# Global variables
+FILEPATH = "Sudoku_instances/sudoku_template.txt"
+NAME = "sudoku_template"
+MAX_RUNS = 250
 
-from save_file import (
-    save_sudoku_file
-)
+
+def parse_sudoku_file(filepath):
+    rows = []
+
+    with open(filepath, 'r') as file:
+        lines = file.readlines()
+        file.close()
+
+    for line in lines:
+        numbers = line.split()
+        row = []
+
+        if len(numbers) == 0:
+            break
+
+        for number in numbers:
+            row.append(int(number))
+        rows.append(row)
+
+    return rows
+
+
+def save_sudoku_file(tour, subgraphs, time):
+    filepath = f"Sudoku_results/{NAME}_solution.txt"
+    rows = subgraphs[0]
+
+    with open(filepath, 'w') as f:
+        for row in rows:
+            for cell in row:
+                f.write(f"{tour[cell]} ")
+            f.write("\n")
+
+        f.write(f"\ntotal time {time} seconds")
+        f.close()
+
+    print(f"Result saved in {filepath}")
 
 
 def generate_sudoku(n):
@@ -291,7 +325,7 @@ def validate_sudoku(sudoku, subgraphs):
     return True
 
 
-def solve_sudoku(sudoku, numbers, subgraphs, runs):
+def solve_sudoku(sudoku, numbers, subgraphs):
     cell_matrix = generate_cell_matrix(sudoku)
 
     start = time.time()
@@ -309,14 +343,14 @@ def solve_sudoku(sudoku, numbers, subgraphs, runs):
                 cell_variations.append([cell, number])
 
                 counter += 1
-                if counter >= runs:
+                if counter >= MAX_RUNS:
                     break
-            if counter >= runs:
+            if counter >= MAX_RUNS:
                 break
 
     for cell_number in cell_variations:
         run_counter += 1
-        print(f"Run: {run_counter}")
+        print(f"Current run: {run_counter}")
         print(f"{round(time.time() - start, 2)} seconds")
         print(cell_number[0], cell_number[1])
 
@@ -329,20 +363,16 @@ def solve_sudoku(sudoku, numbers, subgraphs, runs):
         if cost == min_cost:
             break
 
-    end = time.time()
+    print("Saving result...")
+    save_sudoku_file(tour, subgraphs, round(time.time() - start, 2))
+    print("Saved.")
 
-    print(f"Total time: {round(end - start, 2)} seconds")
-    print(tour)
+    print(f"Total time: {round(time.time() - start, 2)} seconds")
     print(f"Lowest cost: {lowest_cost}")
-
-    return tour
 
 
 def main():
-    instance_name = "sudoku_instances/april_5_2025.txt"
-    filename = instance_name.split("/")[-1]
-    sudoku = parse_sudoku_file(instance_name)
-
+    sudoku = parse_sudoku_file(FILEPATH)
     numbers = list(range(1, len(sudoku) + 1))
     subgraphs = generate_subgraphs(numbers)
 
@@ -350,9 +380,7 @@ def main():
     if is_valid is False:
         return
 
-    tour = solve_sudoku(sudoku, numbers, subgraphs, 100)
-
-    save_sudoku_file(tour, subgraphs, filename)
+    solve_sudoku(sudoku, numbers, subgraphs)
 
 
 if __name__ == "__main__":
