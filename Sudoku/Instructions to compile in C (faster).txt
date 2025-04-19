@@ -1,6 +1,4 @@
-On the main() choose the instance remember that this is for a 9x9 sudoku if you
-want to test on small or bigger instances adjust the variables on the start of
-the file
+Change FILEPATH to the instance path and NAME to the instance name, remember it is set to a 9x9 sudoku but can be adjusted.
 
 and then type: 
 gcc -o solver solver.c -lm
