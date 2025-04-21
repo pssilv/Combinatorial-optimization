@@ -1,4 +1,4 @@
-Change FILEPATH to the instance path and NAME to the instance name the limit is 1000 nodes but can be adjusted
+Change FILEPATH to the instance path and NAME to the instance name the limit is 1000 nodes but can be adjusted.
 
 and then type: 
 gcc -o solver solver.c -lm

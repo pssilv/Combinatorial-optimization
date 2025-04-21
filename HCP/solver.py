@@ -5,6 +5,7 @@ FILEPATH = "HCP_instances/undefined.hcp"
 NAME = "undefined"
 
 
+# TSPLIB format
 def parse_hcp(file_content):
     with open(file_content, 'r') as file:
         file_content = file.read()
@@ -26,8 +27,8 @@ def parse_hcp(file_content):
         if edge_data_section:
             parts = line.split()
             if len(parts) == 2:
-                u = int(parts[0])
-                v = int(parts[1])
+                u = int(parts[0]) - 1
+                v = int(parts[1]) - 1
 
                 if u not in graph:
                     graph[u] = []
@@ -42,7 +43,7 @@ def parse_hcp(file_content):
     return graph
 
 
-# Save a solution in TSBLIB format.
+# Save a solution in TSPLIB format
 def save_tour_file(tour, time):
     filepath = f"HCP_results/{NAME}.tour"
     num_nodes = len(tour)
@@ -56,7 +57,7 @@ def save_tour_file(tour, time):
         f.write("EDGE_DATA_SECTION\n")
 
         for node in tour:
-            f.write(f"{node}\n")
+            f.write(f"{node + 1}\n")
 
         f.write("-1\n")
         f.write("EOF\n")
@@ -115,8 +116,8 @@ def two_opt_swap(processed_distances, initial_tour):
 
                         if shortest_dist == len(processed_distances):
                             return best_tour, shortest_dist
-
                         break
+
             if improved:
                 break
 
@@ -154,25 +155,22 @@ def two_opt_and_swap(processed_distances, initial_tour):
     best_tour, shortest_dist = two_opt_swap(processed_distances, worsened_tour)
     current_tour = best_tour.copy()
     n = len(best_tour)
-    global_improved = True
+    improved = True
 
-    while global_improved:
-        global_improved = False
-
+    while improved:
+        improved = False
         for i in range(n - 1):
             for j in range(n):
                 if i != j:
                     current_tour[i], current_tour[j] = current_tour[j], current_tour[i]
-
-                    tour_2opt, dist_2opt = two_opt_swap(processed_distances, current_tour)
-                    if dist_2opt < shortest_dist:
-                        best_tour = tour_2opt
+                    new_tour, new_dist = two_opt_swap(processed_distances, current_tour)
+                    if new_dist < shortest_dist:
+                        best_tour = new_tour
                         current_tour = best_tour.copy()
-                        shortest_dist = dist_2opt
-                        global_improved = True
+                        shortest_dist = new_dist
+                        improved = True
 
                         print(f"2-opt improvement: {shortest_dist}")
-
                         if shortest_dist == len(processed_distances):
                             return best_tour, shortest_dist
 
@@ -180,7 +178,7 @@ def two_opt_and_swap(processed_distances, initial_tour):
 
 
 def nearest_neighbor(processed_distances, initial_point):
-    current_tour = {1, initial_point}
+    current_tour = {0, initial_point}
     last_element = initial_point
 
     while len(current_tour) < len(processed_distances):
@@ -227,10 +225,10 @@ def solve_HCP(graph):
     start = time.time()
     processed_distances = generate_distance_matrix(graph)
     best_tour, shortest_dist = None, float("inf")
-    initial_point = 2
+    initial_point = 1
 
     while initial_point < len(graph):
-        print(f"Runs: {initial_point - 1}, time: {round(time.time() - start, 2)}")
+        print(f"Runs: {initial_point}, time: {round(time.time() - start, 2)}")
 
         initial_tour = nearest_neighbor(processed_distances, initial_point)
         tour, dist = two_opt_and_swap(processed_distances, initial_tour)

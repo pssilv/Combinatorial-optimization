@@ -8,9 +8,9 @@
 
 #define MAX_NODES 1000
 #define MAX_RUNS 5
-#define NAME "xqf131"
-#define FILEPATH "TSP_instances/xqf131.tsp"
-#define OPT_FILEPATH "TSP_instances/xqf131.tour" // Optional set to NULL if theres none.
+#define NAME "ch130"
+#define FILEPATH "TSP_instances/ch130.tsp"
+#define OPT_FILEPATH "TSP_instances/ch130.opt.tour" // Optional set to NULL if theres none.
 
 typedef struct {
     long long int x, y; // int may be small for some coordinates
@@ -306,10 +306,10 @@ TourResult two_opt_and_swap(int** distances, const int* initial_tour, int n) {
     int shortest_dist = best.dist;
     int* current_tour = malloc(n * sizeof(int));
     memcpy(current_tour, best_tour, n * sizeof(int));
-    bool global_improved = true;
+    bool improved = true;
 
-    while (global_improved) {
-        global_improved = false;
+    while (improved) {
+        improved = false;
         for (int i = 0; i < n - 1; i++) {
             for (int j = 0; j < n; j++) {
                 if (i != j) {
@@ -322,13 +322,10 @@ TourResult two_opt_and_swap(int** distances, const int* initial_tour, int n) {
                         best_tour = temp_result.tour;
                         memcpy(current_tour, best_tour, n * sizeof(int));
                         shortest_dist = temp_result.dist;
-                        global_improved = true;
+                        improved = true;
                         printf("2-opt improvement: %d\n", shortest_dist);
                     } else {
                         free(temp_result.tour);
-                        temp = current_tour[i];
-                        current_tour[i] = current_tour[j];
-                        current_tour[j] = temp;
                     }
                 }
             }
@@ -389,13 +386,14 @@ TourResult solve_tsp(Point* points, int num_points) {
     clock_t start = clock();
     int** distances = pre_process(points, num_points);
     int initial_point = 1;
+    int limit = initial_point + MAX_RUNS;
 
     int* best_tour = NULL;
     int shortest_dist = INT_MAX;
 
     int tourfile_number = create_tour_file();
 
-    while (initial_point <= MAX_RUNS) {
+    while (initial_point < limit) {
         printf("current run: [%d], time: %.2f seconds\n", initial_point, (double)(clock() - start) / CLOCKS_PER_SEC);
 
         int* initial_tour = nearest_neighbor(distances, num_points, initial_point);

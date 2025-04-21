@@ -2,7 +2,7 @@ import time
 import math
 
 # Global variables
-FILEPATH = "Sudoku_instances/sudoku_template.txt"
+FILEPATH = "Sudoku_instances/april_5_2025.txt"
 NAME = "sudoku_template"
 MAX_RUNS = 250
 
@@ -281,14 +281,12 @@ def two_opt_and_swap(initial_tour, numbers, subgraphs, cell_matrix):
                             temp = current_tour[cell1]
                             current_tour[cell1] = current_tour[cell2]
                             current_tour[cell2] = temp
+                            new_tour, new_global_cost = two_opt(current_tour, numbers, subgraphs, cell_matrix, cells)
 
-                            tour_2opt, new_global_cost = two_opt(current_tour, numbers, subgraphs, cell_matrix, cells)
                             if new_global_cost < global_cost:
-                                best_tour = tour_2opt
-                                current_tour = best_tour.copy()
+                                best_tour = new_tour
                                 global_cost = new_global_cost
                                 improved = True
-
                                 print(global_cost)
 
                                 if global_cost == min_cost:

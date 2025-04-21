@@ -8,7 +8,7 @@
 
 #define N 9          // Size of the Sudoku (9x9)
 #define SQRT_N 3     // Square root of N (3 for 9x9)
-#define MAX_RUNS 500 // Maximum number of variations
+#define MAX_RUNS 250 // Maximum number of variations
 #define MIN_COST (N * N * 3) // Minimum cost for perfect solution
 #define FILEPATH "Sudoku_instances/april_5_2025.txt" // Filepath to the instance
 #define NAME "april_5_2025" // Name of solution file
@@ -50,8 +50,8 @@ void generate_subgraphs();
 bool validate_sudoku(int sudoku[N][N]);
 int calculate_global_cost(int tour[N][N]);
 void generate_greedy_tour(int tour[N][N], Cell specific_cell, int specific_number);
-void two_opt_reverse(int tour[N][N], Cell *cells, int n, int temp_tour[N][N]);
 int two_opt(int tour[N][N], Cell *cells, int n, int temp_tour[N][N]);
+void two_opt_reverse(int tour[N][N], Cell *cells, int n, int temp_tour[N][N]);
 int two_opt_and_swap(int tour[N][N]);
 
 // Function to read the Sudoku from a file
@@ -352,41 +352,6 @@ void generate_greedy_tour(int tour[N][N], Cell specific_cell, int specific_numbe
     printf("}\n");
 }
 
-// Function two-opt reverse for worsening the tour
-void two_opt_reverse(int tour[N][N], Cell *cells, int n, int temp_tour[N][N]) {
-    memcpy(temp_tour, tour, sizeof(int) * N * N);
-    int global_cost = calculate_global_cost(temp_tour);
-    bool improved = true;
-
-    while (improved) {
-        improved = false;
-        for (int i = 0; i < n - 1; i++) {
-            for (int j = i + 1; j < n; j++) {
-                Cell cell1 = cells[i];
-                Cell cell2 = cells[j];
-                if (cell_matrix[cell1.row][cell1.col] == 0 &&
-                    cell_matrix[cell2.row][cell2.col] == 0 &&
-                    temp_tour[cell1.row][cell1.col] != temp_tour[cell2.row][cell2.col]) {
-                    int temp = temp_tour[cell1.row][cell1.col];
-                    temp_tour[cell1.row][cell1.col] = temp_tour[cell2.row][cell2.col];
-                    temp_tour[cell2.row][cell2.col] = temp;
-                    int new_global_cost = calculate_global_cost(temp_tour);
-                    if (new_global_cost > global_cost) {
-                        global_cost = new_global_cost;
-                        improved = true;
-                        break;
-                    } else {
-                        temp_tour[cell2.row][cell2.col] = temp_tour[cell1.row][cell1.col];
-                        temp_tour[cell1.row][cell1.col] = temp;
-                    }
-                }
-            }
-            if (improved) break;
-        }
-    }
-    memcpy(tour, temp_tour, sizeof(int) * N * N);
-}
-
 // Function two-opt for optimization
 int two_opt(int tour[N][N], Cell *cells, int n, int temp_tour[N][N]) {
     memcpy(temp_tour, tour, sizeof(int) * N * N);
@@ -423,8 +388,43 @@ int two_opt(int tour[N][N], Cell *cells, int n, int temp_tour[N][N]) {
     return global_cost;
 }
 
+// Function two-opt reverse for worsening the tour
+void two_opt_reverse(int tour[N][N], Cell *cells, int n, int temp_tour[N][N]) {
+    memcpy(temp_tour, tour, sizeof(int) * N * N);
+    int global_cost = calculate_global_cost(temp_tour);
+    bool improved = true;
+
+    while (improved) {
+        improved = false;
+        for (int i = 0; i < n - 1; i++) {
+            for (int j = i + 1; j < n; j++) {
+                Cell cell1 = cells[i];
+                Cell cell2 = cells[j];
+                if (cell_matrix[cell1.row][cell1.col] == 0 &&
+                    cell_matrix[cell2.row][cell2.col] == 0 &&
+                    temp_tour[cell1.row][cell1.col] != temp_tour[cell2.row][cell2.col]) {
+                    int temp = temp_tour[cell1.row][cell1.col];
+                    temp_tour[cell1.row][cell1.col] = temp_tour[cell2.row][cell2.col];
+                    temp_tour[cell2.row][cell2.col] = temp;
+                    int new_global_cost = calculate_global_cost(temp_tour);
+                    if (new_global_cost > global_cost) {
+                        global_cost = new_global_cost;
+                        improved = true;
+                        break;
+                    } else {
+                        temp_tour[cell2.row][cell2.col] = temp_tour[cell1.row][cell1.col];
+                        temp_tour[cell1.row][cell1.col] = temp;
+                    }
+                }
+            }
+            if (improved) break;
+        }
+    }
+    memcpy(tour, temp_tour, sizeof(int) * N * N);
+}
+
 // Function for refinement with simple swaps
-int two_opt_and_swap(int tour[N][N]) {
+int two_opt_and_swap(int initial_tour[N][N]) {
     int current_tour[N][N];
     int temp_tour[N][N];
     int min_cost = N * N * 3;
@@ -440,7 +440,7 @@ int two_opt_and_swap(int tour[N][N]) {
     }
 
     // Worsen the tour first
-    two_opt_reverse(tour, cells, n, temp_tour);
+    two_opt_reverse(initial_tour, cells, n, temp_tour);
     memcpy(best_tour, tour, sizeof(int) * N * N);
     int global_cost = two_opt(best_tour, cells, n, temp_tour);
     memcpy(current_tour, best_tour, sizeof(int) * N * N);

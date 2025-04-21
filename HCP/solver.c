@@ -7,8 +7,8 @@
 
 #define MAX_NODES 1000
 #define MAX_NEIGHBORS 1000
-#define FILEPATH "HCP_instances/undefined.hcp"
-#define NAME "undefined"
+#define FILEPATH "HCP_instances/150_hard.hcp"
+#define NAME "150_hard"
 
 typedef struct {
     int* neighbors;
@@ -32,7 +32,6 @@ bool validate_graph(Node* graph, int num_nodes);
 void free_graph(Node* graph, int num_nodes);
 void free_distances(int** distances, int num_nodes);
 void print_graph(Node* graph, int num_nodes);
-
 
 Node* parse_hcp(const char* filename, int* num_nodes) {
     FILE* file = fopen(filename, "r");
@@ -139,7 +138,7 @@ int** generate_distance_matrix(Node* graph, int num_nodes) {
             for (int k = 0; k < graph[i].num_neighbors; k++) {
                 if (graph[i].neighbors[k] == j) {
                     adjacent = true;
-  break;
+                    break;
                 }
             }
             distances[i][j] = adjacent ? 1 : 2;
@@ -237,10 +236,10 @@ TourResult two_opt_and_swap(int** distances, const int* initial_tour, int n) {
     int shortest_dist = best.dist;
     int* current_tour = malloc(n * sizeof(int));
     memcpy(current_tour, best_tour, n * sizeof(int));
-    bool global_improved = true;
+    bool improved = true;
 
-    while (global_improved) {
-        global_improved = false;
+    while (improved) {
+        improved = false;
         for (int i = 0; i < n - 1; i++) {
             for (int j = 0; j < n; j++) {
                 if (i != j) {
@@ -253,14 +252,11 @@ TourResult two_opt_and_swap(int** distances, const int* initial_tour, int n) {
                         best_tour = temp_result.tour;
                         memcpy(current_tour, best_tour, n * sizeof(int));
                         shortest_dist = temp_result.dist;
-                        global_improved = true;
+                        improved = true;
                         printf("2-opt improvement: %d\n", shortest_dist);
                         if (shortest_dist == n) goto end;
                     } else {
                         free(temp_result.tour);
-                        temp = current_tour[i];
-                        current_tour[i] = current_tour[j];
-                        current_tour[j] = temp;
                     }
                 }
             }
@@ -277,13 +273,13 @@ int* nearest_neighbor(int** distances, int n, int initial_point) {
     bool* visited = calloc(n, sizeof(bool));
     int tour_size = 0;
 
-    tour[tour_size++] = 1;
-    visited[1] = true;
-    if (initial_point != 1 && initial_point >= 0 && initial_point < n) {
+    tour[tour_size++] = 0;
+    visited[0] = true;
+    if (initial_point != 0 && initial_point >= 0 && initial_point < n) {
         tour[tour_size++] = initial_point;
         visited[initial_point] = true;
     }
-    int last_element = initial_point != 1 ? initial_point : 1;
+    int last_element = initial_point != 0 ? initial_point : 0;
 
     while (tour_size < n) {
         bool added = false;
@@ -322,12 +318,12 @@ int* nearest_neighbor(int** distances, int n, int initial_point) {
 bool validate_graph(Node* graph, int num_nodes) {
     for (int i = 0; i < num_nodes; i++) {
         if (graph[i].num_neighbors == 0) {
-            printf("Error: node %d is isolated.\n", i);
+            printf("Error: node %d is isolated.\n", i + 1);
             return false;
         }
         for (int j = 0; j < graph[i].num_neighbors; j++) {
             if (graph[i].neighbors[j] == i) {
-              printf("Error: node %d have himself as neighbor.", i+1); 
+              printf("Error: node %d have himself as neighbor.", i + 1); 
               return false;
             }
 
@@ -340,7 +336,7 @@ bool validate_graph(Node* graph, int num_nodes) {
                 }
             }
             if (!found) {
-                printf("Error: connection between %d and %d is not bidirectional\n", i, neighbor);
+                printf("Error: connection between %d and %d is not bidirectional\n", i + 1, neighbor + 1);
                 return false;
             }
         }
@@ -378,13 +374,13 @@ void print_graph(Node* graph, int num_nodes) {
 TourResult solve_hcp(Node* graph, int num_nodes) {
     clock_t start = clock();
     int** distances = generate_distance_matrix(graph, num_nodes);
-    int initial_point = 2;
+    int initial_point = 1;
 
     int* best_tour = NULL;
     int shortest_dist = INT_MAX;
 
     while (initial_point < num_nodes) {
-        printf("Runs: %d, time: %.2f\n", initial_point - 1, (double)(clock() - start) / CLOCKS_PER_SEC);
+        printf("Runs: %d, time: %.2f\n", initial_point, (double)(clock() - start) / CLOCKS_PER_SEC);
 
         int* initial_tour = nearest_neighbor(distances, num_nodes, initial_point);
         TourResult result = two_opt_and_swap(distances, initial_tour, num_nodes);
@@ -401,13 +397,6 @@ TourResult solve_hcp(Node* graph, int num_nodes) {
 
         initial_point++;
     }
-
-    printf("[");
-    for (int i = 0; i < num_nodes; i++) {
-        printf("%d", best_tour[i]);
-        if (i < num_nodes - 1) printf(", ");
-    }
-    printf("]\n");
 
     printf("Saving result...\n");
     save_tour_file(best_tour, num_nodes, (double)(clock() - start) / CLOCKS_PER_SEC);

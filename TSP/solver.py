@@ -4,9 +4,9 @@ import os
 
 #  Global variables
 MAX_RUNS = 5
-NAME = "bay29"
-FILEPATH = "TSP_instances/bayg29.tsp"
-OPT_FILEPATH = "TSP_instances/bayg29.opt.tour" #  Optional set to None if theres none.
+NAME = "pr76"
+FILEPATH = "TSP_instances/pr76.tsp"
+OPT_FILEPATH = "TSP_instances/pr76.opt.tour" #  Optional set to None if theres none.
 
 
 def parse_tsp_file(file_path):
@@ -201,6 +201,9 @@ def two_opt_reverse(processed_distances, initial_tour):
                     best_tour = temp_tour
                     longest_dist = new_dist
                     improved = True
+                    break
+            if improved:
+                break
 
     return best_tour
 
@@ -208,25 +211,23 @@ def two_opt_reverse(processed_distances, initial_tour):
 def two_opt_and_swap(processed_distances, initial_tour):
     worsened_tour = two_opt_reverse(processed_distances, initial_tour)
     best_tour, shortest_dist = two_opt_swap(processed_distances, worsened_tour)
+    current_tour = best_tour.copy()
     n = len(best_tour)
-    global_improved = True
+    improved = True
 
-    while global_improved:
-        global_improved = False
+    while improved:
+        improved = False
 
         for i in range(n - 1):
-            current_tour = best_tour.copy()
             for j in range(n):
                 if i != j:
                     current_tour[i], current_tour[j] = current_tour[j], current_tour[i]
-
-                    tour_2opt, dist_2opt = two_opt_swap(processed_distances, current_tour)
-                    if dist_2opt < shortest_dist:
-                        best_tour = tour_2opt
+                    new_tour, new_dist = two_opt_swap(processed_distances, current_tour)
+                    if new_dist < shortest_dist:
+                        best_tour = new_tour
                         current_tour = best_tour.copy()
-                        shortest_dist = dist_2opt
-                        global_improved = True
-
+                        shortest_dist = new_dist
+                        improved = True
                         print(f"2-opt improvement: {shortest_dist}")
 
     return best_tour, shortest_dist
@@ -251,13 +252,14 @@ def solve_tsp(points):
     start = time.time()
     processed_distances = pre_process(points)
     initial_point = 1
+    limit = initial_point + MAX_RUNS
 
     best_tour = None
     shortest_dist = float("inf")
 
     tourfile_number = create_tour_file()
 
-    while initial_point <= MAX_RUNS:
+    while initial_point < limit:
         print(f"current run: [{initial_point}], time: {round(time.time() - start, 2)} seconds")
         initial_point += 1
 
