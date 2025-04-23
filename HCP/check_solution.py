@@ -68,9 +68,9 @@ def parse_hcp(file_content):
 def check_solution(graph, tour):
     n = len(tour)
 
-    for i in range(n - 1):
+    for i in range(n):
         node = tour[i]
-        next_node = tour[i + 1]
+        next_node = tour[(i + 1) % n]
 
         if next_node not in graph[node]:
             print("Solution is invalid!")
