@@ -26,7 +26,7 @@ Is there a value less than x?
 Is there a value bigger than x?
 Is there a value equals to x?
 
-The algorithm can't beat all instances of all NP-complete problems, it fails on hamiltonian graphs from the FHCP challenge set butthe perfomance on others problems like "Weekly Unsolvable Sudoku" and Travelling Salesman Problem is really good.
+The algorithm can't beat all instances of all NP-complete problems, it fails on hamiltonian graphs from the FHCP challenge set but the perfomance on others problems like "Weekly Unsolvable Sudoku" and Travelling Salesman Problem is really good.
 
 I also want to share some things i learned while studying NP-complete problems:
 First thing is that we can have easy, medium, hard and no-solution instances and if it's hard to us, it's hard for computer too so it's computation expensive to 
