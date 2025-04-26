@@ -81,8 +81,8 @@ def check_solution(graph, tour):
 
 
 def main():
-    tour = parse_tour_file("HCP_results/150_hard.tour")
-    graph = parse_hcp("HCP_instances/150_hard.hcp")
+    tour = parse_tour_file("HCP_results/graph1.tour")
+    graph = parse_hcp("HCP_instances/graph1.hcp")
 
     check_solution(graph, tour)
 

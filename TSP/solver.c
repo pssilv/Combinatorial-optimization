@@ -8,9 +8,9 @@
 
 #define MAX_NODES 1000
 #define MAX_RUNS 5
-#define NAME "ch130"
-#define FILEPATH "TSP_instances/ch130.tsp"
-#define OPT_FILEPATH "TSP_instances/ch130.opt.tour" // Optional set to NULL if theres none.
+#define FILEPATH "TSP_instances/xqf131.tsp"
+#define OPT_FILEPATH "TSP_instances/xqf131.tour" // Optional set to NULL if theres none.
+#define NAME "xqf131"
 
 typedef struct {
     long long int x, y; // int may be small for some coordinates
@@ -252,11 +252,9 @@ TourResult two_opt_swap(int** distances, const int* initial_tour, int n) {
                         }
                         shortest_dist += delta;
                         improved = true;
-                        break;
                     }
                 }
             }
-            if (improved) break;
         }
     }
 
@@ -287,12 +285,10 @@ int* two_opt_reverse(int** distances, const int* initial_tour, int n) {
                     best_tour = temp_tour;
                     longest_dist = new_dist;
                     improved = true;
-                    break;
                 } else {
                     free(temp_tour);
                 }
             }
-            if (improved) break;
         }
     }
     return best_tour;
@@ -324,14 +320,16 @@ TourResult two_opt_and_swap(int** distances, const int* initial_tour, int n) {
                         shortest_dist = temp_result.dist;
                         improved = true;
                         printf("2-opt improvement: %d\n", shortest_dist);
+                        break;
                     } else {
                         free(temp_result.tour);
                     }
                 }
             }
+            if (improved) break;
         }
     }
-
+end:
     free(current_tour);
     TourResult result = {best_tour, shortest_dist};
     return result;

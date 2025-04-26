@@ -7,8 +7,8 @@ from solver import (
 )
 
 
-FILEPATH = "TSP_instances/xqf131.tsp"
-TOUR_FILEPATH = "TSP_results/xqf131_1.tour"
+FILEPATH = "TSP_instances/ch130.tsp"
+TOUR_FILEPATH = "TSP_results/pr76_3.tour"
 
 
 def generate_canvas(points, tour):

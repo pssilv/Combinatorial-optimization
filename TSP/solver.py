@@ -4,9 +4,9 @@ import os
 
 #  Global variables
 MAX_RUNS = 5
-NAME = "pr76"
 FILEPATH = "TSP_instances/pr76.tsp"
 OPT_FILEPATH = "TSP_instances/pr76.opt.tour" #  Optional set to None if theres none.
+NAME = "pr76"
 
 
 def parse_tsp_file(file_path):
@@ -119,18 +119,17 @@ def calculate_tour_length(tour, processed_distances):
 
 def calculate_tour_distance(points, tour):
     total_distance = 0
+    n = len(tour)
 
-    for idx in range(len(tour) - 1):
+    for idx in range(n):
         point1 = tour[idx]
-        point2 = tour[idx + 1]
+        point2 = tour[(idx + 1) % n]
 
         initial_point = points[point1]
         target_point = points[point2]
 
         distance = calculate_distance(initial_point, target_point)
         total_distance += distance
-
-    total_distance += calculate_distance(points[tour[-1]], points[tour[0]])
 
     return total_distance
 
@@ -175,9 +174,6 @@ def two_opt_swap(processed_distances, initial_tour):
                         best_tour[i + 1:j + 1] = best_tour[j:i:-1]
                         shortest_dist += delta
                         improved = True
-                        break
-            if improved:
-                break
 
     return best_tour, shortest_dist
 
@@ -201,9 +197,6 @@ def two_opt_reverse(processed_distances, initial_tour):
                     best_tour = temp_tour
                     longest_dist = new_dist
                     improved = True
-                    break
-            if improved:
-                break
 
     return best_tour
 
@@ -229,6 +222,9 @@ def two_opt_and_swap(processed_distances, initial_tour):
                         shortest_dist = new_dist
                         improved = True
                         print(f"2-opt improvement: {shortest_dist}")
+                        break
+            if improved:
+                break
 
     return best_tour, shortest_dist
 

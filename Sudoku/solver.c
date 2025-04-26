@@ -3,58 +3,51 @@
 #include <string.h>
 #include <stdbool.h>
 #include <time.h>
-#include <limits.h>
 #include <math.h>
+#include <limits.h>
 
-#define N 9          // Size of the Sudoku (9x9)
-#define SQRT_N 3     // Square root of N (3 for 9x9)
-#define MAX_RUNS 250 // Maximum number of variations
-#define MIN_COST (N * N * 3) // Minimum cost for perfect solution
-#define FILEPATH "Sudoku_instances/april_5_2025.txt" // Filepath to the instance
-#define NAME "april_5_2025" // Name of solution file
+#define N 9 // Size of sudoku NxN
+#define SQRT_N 3 // Square root of N
+#define MAX_RUNS 250
+#define MIN_COST (N * N * 3) // each row, column and block should have cost N 
+#define FILEPATH "Sudoku_instances/march_22_2025.txt"
+#define NAME "march_22_2025"
 
-// Structure for a cell
 typedef struct {
     int row;
     int col;
 } Cell;
 
-// Structure for a subgraph (row, column, or block)
 typedef struct {
     Cell cells[N];
     int size;
 } Subgraph;
 
-// Structure to store all subgraphs
 typedef struct {
     Subgraph rows[N];
     Subgraph columns[N];
     Subgraph blocks[N];
-    int row_count;
-    int col_count;
-    int block_count;
 } Subgraphs;
 
-// Global variables
-int sudoku[N][N];  // Initialized from the file
+int sudoku[N][N];
 int cell_matrix[N][N];
 int numbers[N];
 int tour[N][N];
-int best_tour[N][N];
 Subgraphs subgraphs;
 
 void parse_sudoku_file(const char *file_path);
 void save_sudoku_file(double time);
 void generate_cell_matrix();
 void generate_subgraphs();
-bool validate_sudoku(int sudoku[N][N]);
+bool validate_sudoku();
 int calculate_global_cost(int tour[N][N]);
-void generate_greedy_tour(int tour[N][N], Cell specific_cell, int specific_number);
-int two_opt(int tour[N][N], Cell *cells, int n, int temp_tour[N][N]);
-void two_opt_reverse(int tour[N][N], Cell *cells, int n, int temp_tour[N][N]);
-int two_opt_and_swap(int tour[N][N]);
+void generate_greedy_tour(Cell specific_cell, int specific_number);
+void two_opt(int tour[N][N], Cell *cells, int n, int *global_cost);
+void two_opt_reverse(int tour[N][N], Cell *cells, int n);
+int two_opt_and_swap(int initial_tour[N][N], Cell *cells, int n);
+void solve_sudoku(int runs);
+void print_tour(int tour[N][N]);
 
-// Function to read the Sudoku from a file
 void parse_sudoku_file(const char *file_path) {
     FILE *file = fopen(file_path, "r");
     if (!file) {
@@ -71,35 +64,30 @@ void parse_sudoku_file(const char *file_path) {
             }
         }
     }
-
     fclose(file);
 }
 
-// Function to save the solved Sudoku
 void save_sudoku_file(double time) {
-    char output_path[256];
-    snprintf(output_path, sizeof(output_path), "Sudoku_results/%s_solution.txt", NAME);
-
-    FILE *file = fopen(output_path, "w");
+    char filepath[256];
+    snprintf(filepath, sizeof(filepath), "Sudoku_results/%s_solution.txt", NAME);
+    FILE *file = fopen(filepath, "w");
     if (!file) {
-        printf("Error creating file %s\n", output_path);
+        printf("Error creating file %s\n", filepath);
         exit(1);
     }
 
-    for (int r = 0; r < subgraphs.row_count; r++) {
+    for (int r = 0; r < N; r++) {
         for (int c = 0; c < subgraphs.rows[r].size; c++) {
             Cell cell = subgraphs.rows[r].cells[c];
             fprintf(file, "%d ", tour[cell.row][cell.col]);
         }
         fprintf(file, "\n");
     }
-
     fprintf(file, "\ntotal time %.2f seconds", time);
     fclose(file);
-    printf("Result saved in %s\n", output_path);
+    printf("Result saved in %s\n", filepath);
 }
 
-// Function to copy sudoku to cell_matrix
 void generate_cell_matrix() {
     for (int i = 0; i < N; i++) {
         for (int j = 0; j < N; j++) {
@@ -108,231 +96,122 @@ void generate_cell_matrix() {
     }
 }
 
-// Function to generate subgraphs (rows, columns, blocks)
 void generate_subgraphs() {
-    int row_idx = 0, col_idx = 0, block_idx = 0;
-
-    // Rows
     for (int i = 0; i < N; i++) {
-        subgraphs.rows[row_idx].size = 0;
+        subgraphs.rows[i].size = N;
         for (int j = 0; j < N; j++) {
-            subgraphs.rows[row_idx].cells[subgraphs.rows[row_idx].size].row = i;
-            subgraphs.rows[row_idx].cells[subgraphs.rows[row_idx].size].col = j;
-            subgraphs.rows[row_idx].size++;
+            subgraphs.rows[i].cells[j].row = i;
+            subgraphs.rows[i].cells[j].col = j;
         }
-        row_idx++;
     }
-    subgraphs.row_count = row_idx;
 
-    // Columns
     for (int j = 0; j < N; j++) {
-        subgraphs.columns[col_idx].size = 0;
+        subgraphs.columns[j].size = N;
         for (int i = 0; i < N; i++) {
-            subgraphs.columns[col_idx].cells[subgraphs.columns[col_idx].size].row = i;
-            subgraphs.columns[col_idx].cells[subgraphs.columns[col_idx].size].col = j;
-            subgraphs.columns[col_idx].size++;
+            subgraphs.columns[j].cells[i].row = i;
+            subgraphs.columns[j].cells[i].col = j;
         }
-        col_idx++;
     }
-    subgraphs.col_count = col_idx;
 
-    // Blocks
+    int block_idx = 0;
     for (int i = 0; i < N; i += SQRT_N) {
         for (int j = 0; j < N; j += SQRT_N) {
-            subgraphs.blocks[block_idx].size = 0;
+            subgraphs.blocks[block_idx].size = N;
+            int idx = 0;
             for (int i2 = i; i2 < i + SQRT_N; i2++) {
                 for (int j2 = j; j2 < j + SQRT_N; j2++) {
-                    subgraphs.blocks[block_idx].cells[subgraphs.blocks[block_idx].size].row = i2;
-                    subgraphs.blocks[block_idx].cells[subgraphs.blocks[block_idx].size].col = j2;
-                    subgraphs.blocks[block_idx].size++;
+                    subgraphs.blocks[block_idx].cells[idx].row = i2;
+                    subgraphs.blocks[block_idx].cells[idx].col = j2;
+                    idx++;
                 }
             }
             block_idx++;
         }
     }
-    subgraphs.block_count = block_idx;
 }
 
-// Function to validate the Sudoku puzzle
-bool validate_sudoku(int sudoku[N][N]) {
-    // Check rows
-    for (int r = 0; r < subgraphs.row_count; r++) {
-        int used[N + 1] = {0};
-        for (int c = 0; c < subgraphs.rows[r].size; c++) {
-            Cell cell = subgraphs.rows[r].cells[c];
-            int val = sudoku[cell.row][cell.col];
-            if (val != 0) {
-                used[val]++;
+bool validate_sudoku() {
+    for (int s = 0; s < 3; s++) {
+        Subgraph *structs = (s == 0) ? subgraphs.rows : (s == 1) ? subgraphs.columns : subgraphs.blocks;
+        for (int i = 0; i < N; i++) {
+            int used[N + 1] = {0};
+            for (int j = 0; j < structs[i].size; j++) {
+                Cell cell = structs[i].cells[j];
+                int val = sudoku[cell.row][cell.col];
+                if (val != 0) {
+                    used[val]++;
+                }
             }
-        }
-        printf("{");
-        bool first = true;
-        for (int i = 1; i <= N; i++) {
-            if (used[i] > 0) {
-                if (!first) printf(", ");
-                printf("%d: %d", i, used[i]);
-                first = false;
+            printf("{");
+            bool first = true;
+            for (int num = 1; num <= N; num++) {
+                if (used[num] > 0) {
+                    if (!first) printf(", ");
+                    printf("%d: %d", num, used[num]);
+                    first = false;
+                }
             }
-        }
-        printf("}\n");
-        for (int i = 1; i <= N; i++) {
-            if (used[i] > 1) {
-                printf("Invalid sudoku\n");
-                return false;
-            }
-        }
-    }
-
-    // Check columns
-    for (int c = 0; c < subgraphs.col_count; c++) {
-        int used[N + 1] = {0};
-        for (int i = 0; i < subgraphs.columns[c].size; i++) {
-            Cell cell = subgraphs.columns[c].cells[i];
-            int val = sudoku[cell.row][cell.col];
-            if (val != 0) {
-                used[val]++;
-            }
-        }
-        printf("{");
-        bool first = true;
-        for (int i = 1; i <= N; i++) {
-            if (used[i] > 0) {
-                if (!first) printf(", ");
-                printf("%d: %d", i, used[i]);
-                first = false;
-            }
-        }
-        printf("}\n");
-        for (int i = 1; i <= N; i++) {
-            if (used[i] > 1) {
-                printf("Invalid sudoku\n");
-                return false;
+            printf("}\n");
+            for (int num = 1; num <= N; num++) {
+                if (used[num] > 1) {
+                    printf("Invalid sudoku\n");
+                    return false;
+                }
             }
         }
     }
-
-    // Check blocks
-    for (int b = 0; b < subgraphs.block_count; b++) {
-        int used[N + 1] = {0};
-        for (int c = 0; c < subgraphs.blocks[b].size; c++) {
-            Cell cell = subgraphs.blocks[b].cells[c];
-            int val = sudoku[cell.row][cell.col];
-            if (val != 0) {
-                used[val]++;
-            }
-        }
-        printf("{");
-        bool first = true;
-        for (int i = 1; i <= N; i++) {
-            if (used[i] > 0) {
-                if (!first) printf(", ");
-                printf("%d: %d", i, used[i]);
-                first = false;
-            }
-        }
-        printf("}\n");
-        for (int i = 1; i <= N; i++) {
-            if (used[i] > 1) {
-                printf("Invalid sudoku\n");
-                return false;
-            }
-        }
-    }
-
     printf("Sudoku seems valid.\n");
     return true;
 }
 
-// Function to calculate the global cost
 int calculate_global_cost(int tour[N][N]) {
     int global_cost = 0;
 
-    // Rows
-    for (int r = 0; r < subgraphs.row_count; r++) {
-        bool used[N + 1] = {false};
-        int unique_count = 0;
-        for (int c = 0; c < subgraphs.rows[r].size; c++) {
-            Cell cell = subgraphs.rows[r].cells[c];
-            int val = tour[cell.row][cell.col];
-            if (!used[val]) {
-                used[val] = true;
-                unique_count++;
+    for (int s = 0; s < 3; s++) {
+        Subgraph *structs = (s == 0) ? subgraphs.rows : (s == 1) ? subgraphs.columns : subgraphs.blocks;
+        for (int i = 0; i < N; i++) {
+            bool used[N + 1] = {false};
+            int unique_count = 0;
+            for (int j = 0; j < structs[i].size; j++) {
+                Cell cell = structs[i].cells[j];
+                int val = tour[cell.row][cell.col];
+                if (!used[val]) {
+                    used[val] = true;
+                    unique_count++;
+                }
             }
+            global_cost += unique_count + (N - unique_count) * 2;
         }
-        global_cost += unique_count + (N - unique_count) * 2;
     }
-
-    // Columns
-    for (int c = 0; c < subgraphs.col_count; c++) {
-        bool used[N + 1] = {false};
-        int unique_count = 0;
-        for (int i = 0; i < subgraphs.columns[c].size; i++) {
-            Cell cell = subgraphs.columns[c].cells[i];
-            int val = tour[cell.row][cell.col];
-            if (!used[val]) {
-                used[val] = true;
-                unique_count++;
-            }
-        }
-        global_cost += unique_count + (N - unique_count) * 2;
-    }
-
-    // Blocks
-    for (int b = 0; b < subgraphs.block_count; b++) {
-        bool used[N + 1] = {false};
-        int unique_count = 0;
-        for (int c = 0; c < subgraphs.blocks[b].size; c++) {
-            Cell cell = subgraphs.blocks[b].cells[c];
-            int val = tour[cell.row][cell.col];
-            if (!used[val]) {
-                used[val] = true;
-                unique_count++;
-            }
-        }
-        global_cost += unique_count + (N - unique_count) * 2;
-    }
-
     return global_cost;
 }
 
-// Function to generate an initial greedy solution
-void generate_greedy_tour(int tour[N][N], Cell specific_cell, int specific_number) {
-    bool used[N + 1];
-    int i, j;
-
-    // Initialize tour
-    for (i = 0; i < N; i++) {
-        for (j = 0; j < N; j++) {
+void generate_greedy_tour(Cell specific_cell, int specific_number) {
+    for (int i = 0; i < N; i++) {
+        for (int j = 0; j < N; j++) {
             tour[i][j] = 0;
         }
     }
 
-    for (int r = 0; r < subgraphs.row_count; r++) {
-        memset(used, 0, sizeof(used));
-        // Fill fixed values
+    for (int r = 0; r < N; r++) {
+        bool used[N + 1] = {false};
         for (int c = 0; c < subgraphs.rows[r].size; c++) {
             Cell cell = subgraphs.rows[r].cells[c];
-            i = cell.row;
-            j = cell.col;
-            if (cell_matrix[i][j] != 0 && !used[cell_matrix[i][j]]) {
-                tour[i][j] = cell_matrix[i][j];
-                used[cell_matrix[i][j]] = true;
+            if (cell_matrix[cell.row][cell.col] != 0 && !used[cell_matrix[cell.row][cell.col]]) {
+                tour[cell.row][cell.col] = cell_matrix[cell.row][cell.col];
+                used[cell_matrix[cell.row][cell.col]] = true;
             }
         }
-        // Fill specific cell
-        if (specific_cell.row == subgraphs.rows[r].cells[0].row && !used[specific_number]) {
+        if (subgraphs.rows[r].cells[0].row == specific_cell.row && !used[specific_number]) {
             tour[specific_cell.row][specific_cell.col] = specific_number;
             used[specific_number] = true;
         }
-        // Fill remaining cells
         for (int c = 0; c < subgraphs.rows[r].size; c++) {
             Cell cell = subgraphs.rows[r].cells[c];
-            i = cell.row;
-            j = cell.col;
-            if (tour[i][j] == 0) {
+            if (tour[cell.row][cell.col] == 0) {
                 for (int num = 1; num <= N; num++) {
                     if (!used[num]) {
-                        tour[i][j] = num;
+                        tour[cell.row][cell.col] = num;
                         used[num] = true;
                         break;
                     }
@@ -340,11 +219,13 @@ void generate_greedy_tour(int tour[N][N], Cell specific_cell, int specific_numbe
             }
         }
     }
+    print_tour(tour);
+}
 
-    // Print tour
+void print_tour(int tour[N][N]) {
     printf("{");
-    for (i = 0; i < N; i++) {
-        for (j = 0; j < N; j++) {
+    for (int i = 0; i < N; i++) {
+        for (int j = 0; j < N; j++) {
             printf("(%d,%d): %d", i, j, tour[i][j]);
             if (i < N - 1 || j < N - 1) printf(", ");
         }
@@ -352,10 +233,8 @@ void generate_greedy_tour(int tour[N][N], Cell specific_cell, int specific_numbe
     printf("}\n");
 }
 
-// Function two-opt for optimization
-int two_opt(int tour[N][N], Cell *cells, int n, int temp_tour[N][N]) {
-    memcpy(temp_tour, tour, sizeof(int) * N * N);
-    int global_cost = calculate_global_cost(temp_tour);
+void two_opt(int tour[N][N], Cell *cells, int n, int *global_cost) {
+    *global_cost = calculate_global_cost(tour);
     bool improved = true;
 
     while (improved) {
@@ -364,34 +243,27 @@ int two_opt(int tour[N][N], Cell *cells, int n, int temp_tour[N][N]) {
             for (int j = i + 1; j < n; j++) {
                 Cell cell1 = cells[i];
                 Cell cell2 = cells[j];
-                if (cell_matrix[cell1.row][cell1.col] == 0 &&
-                    cell_matrix[cell2.row][cell2.col] == 0 &&
-                    temp_tour[cell1.row][cell1.col] != temp_tour[cell2.row][cell2.col]) {
-                    int temp = temp_tour[cell1.row][cell1.col];
-                    temp_tour[cell1.row][cell1.col] = temp_tour[cell2.row][cell2.col];
-                    temp_tour[cell2.row][cell2.col] = temp;
-                    int new_global_cost = calculate_global_cost(temp_tour);
-                    if (new_global_cost < global_cost) {
-                        global_cost = new_global_cost;
+                if (cell_matrix[cell1.row][cell1.col] == 0 && cell_matrix[cell2.row][cell2.col] == 0 &&
+                    tour[cell1.row][cell1.col] != tour[cell2.row][cell2.col]) {
+                    int temp = tour[cell1.row][cell1.col];
+                    tour[cell1.row][cell1.col] = tour[cell2.row][cell2.col];
+                    tour[cell2.row][cell2.col] = temp;
+                    int new_cost = calculate_global_cost(tour);
+                    if (new_cost < *global_cost) {
+                        *global_cost = new_cost;
                         improved = true;
-                        break;
                     } else {
-                        temp_tour[cell2.row][cell2.col] = temp_tour[cell1.row][cell1.col];
-                        temp_tour[cell1.row][cell1.col] = temp;
+                        tour[cell2.row][cell2.col] = tour[cell1.row][cell1.col];
+                        tour[cell1.row][cell1.col] = temp;
                     }
                 }
             }
-            if (improved) break;
         }
     }
-    memcpy(tour, temp_tour, sizeof(int) * N * N);
-    return global_cost;
 }
 
-// Function two-opt reverse for worsening the tour
-void two_opt_reverse(int tour[N][N], Cell *cells, int n, int temp_tour[N][N]) {
-    memcpy(temp_tour, tour, sizeof(int) * N * N);
-    int global_cost = calculate_global_cost(temp_tour);
+void two_opt_reverse(int tour[N][N], Cell *cells, int n) {
+    int global_cost = calculate_global_cost(tour);
     bool improved = true;
 
     while (improved) {
@@ -400,52 +272,37 @@ void two_opt_reverse(int tour[N][N], Cell *cells, int n, int temp_tour[N][N]) {
             for (int j = i + 1; j < n; j++) {
                 Cell cell1 = cells[i];
                 Cell cell2 = cells[j];
-                if (cell_matrix[cell1.row][cell1.col] == 0 &&
-                    cell_matrix[cell2.row][cell2.col] == 0 &&
-                    temp_tour[cell1.row][cell1.col] != temp_tour[cell2.row][cell2.col]) {
-                    int temp = temp_tour[cell1.row][cell1.col];
-                    temp_tour[cell1.row][cell1.col] = temp_tour[cell2.row][cell2.col];
-                    temp_tour[cell2.row][cell2.col] = temp;
-                    int new_global_cost = calculate_global_cost(temp_tour);
-                    if (new_global_cost > global_cost) {
-                        global_cost = new_global_cost;
+                if (cell_matrix[cell1.row][cell1.col] == 0 && cell_matrix[cell2.row][cell2.col] == 0 &&
+                    tour[cell1.row][cell1.col] != tour[cell2.row][cell2.col]) {
+                    int temp = tour[cell1.row][cell1.col];
+                    tour[cell1.row][cell1.col] = tour[cell2.row][cell2.col];
+                    tour[cell2.row][cell2.col] = temp;
+                    int new_cost = calculate_global_cost(tour);
+                    if (new_cost > global_cost) {
+                        global_cost = new_cost;
                         improved = true;
-                        break;
                     } else {
-                        temp_tour[cell2.row][cell2.col] = temp_tour[cell1.row][cell1.col];
-                        temp_tour[cell1.row][cell1.col] = temp;
+                        tour[cell2.row][cell2.col] = tour[cell1.row][cell1.col];
+                        tour[cell1.row][cell1.col] = temp;
                     }
                 }
             }
-            if (improved) break;
         }
     }
-    memcpy(tour, temp_tour, sizeof(int) * N * N);
 }
 
-// Function for refinement with simple swaps
-int two_opt_and_swap(int initial_tour[N][N]) {
+// For decision problems (NP-complete) generating a new local minimum from a pertubed local minimum have better results.
+int two_opt_and_swap(int initial_tour[N][N], Cell *cells, int n) {
+    int best_tour[N][N];
     int current_tour[N][N];
-    int temp_tour[N][N];
-    int min_cost = N * N * 3;
-    Cell cells[N * N];
-    int n = 0;
+    int global_cost;
 
-    // Collect all cells
-    for (int r = 0; r < subgraphs.row_count; r++) {
-        for (int c = 0; c < subgraphs.rows[r].size; c++) {
-            cells[n] = subgraphs.rows[r].cells[c];
-            n++;
-        }
-    }
-
-    // Worsen the tour first
-    two_opt_reverse(initial_tour, cells, n, temp_tour);
-    memcpy(best_tour, tour, sizeof(int) * N * N);
-    int global_cost = two_opt(best_tour, cells, n, temp_tour);
+    memcpy(best_tour, initial_tour, sizeof(int) * N * N);
+    two_opt_reverse(best_tour, cells, n);
+    two_opt(best_tour, cells, n, &global_cost);
     memcpy(current_tour, best_tour, sizeof(int) * N * N);
 
-    if (global_cost == min_cost) {
+    if (global_cost == MIN_COST) {
         printf("Found!\n");
         memcpy(tour, best_tour, sizeof(int) * N * N);
         return global_cost;
@@ -459,44 +316,42 @@ int two_opt_and_swap(int initial_tour[N][N]) {
                 if (i != j) {
                     Cell cell1 = cells[i];
                     Cell cell2 = cells[j];
-                    if (cell_matrix[cell1.row][cell1.col] == 0 &&
-                        cell_matrix[cell2.row][cell2.col] == 0 &&
+                    if (cell_matrix[cell1.row][cell1.col] == 0 && cell_matrix[cell2.row][cell2.col] == 0 &&
                         current_tour[cell1.row][cell1.col] != current_tour[cell2.row][cell2.col]) {
                         int temp = current_tour[cell1.row][cell1.col];
                         current_tour[cell1.row][cell1.col] = current_tour[cell2.row][cell2.col];
                         current_tour[cell2.row][cell2.col] = temp;
-                        int new_global_cost = two_opt(current_tour, cells, n, temp_tour);
-                        if (new_global_cost < global_cost) {
-                            global_cost = new_global_cost;
+                        int new_cost;
+                        two_opt(current_tour, cells, n, &new_cost);
+                        if (new_cost < global_cost) {
                             memcpy(best_tour, current_tour, sizeof(int) * N * N);
+                            global_cost = new_cost;
                             improved = true;
                             printf("%d\n", global_cost);
-                            if (global_cost == min_cost) {
+                            if (global_cost == MIN_COST) {
                                 printf("Found!\n");
                                 memcpy(tour, best_tour, sizeof(int) * N * N);
                                 return global_cost;
                             }
+                            break;
                         }
                     }
                 }
             }
-        }
-        if (improved) {
-            memcpy(current_tour, best_tour, sizeof(int) * N * N);
+            if (improved) break;
         }
     }
+    print_tour(best_tour);
     memcpy(tour, best_tour, sizeof(int) * N * N);
     return global_cost;
 }
 
-// Function for combinatorial optimization
 void solve_sudoku(int runs) {
     clock_t start = clock();
     Cell cell_variations[MAX_RUNS];
     int number_variations[MAX_RUNS];
     int counter = 0;
 
-    // Generate variations
     for (int i = 0; i < N && counter < runs; i++) {
         for (int j = 0; j < N && counter < runs; j++) {
             if (cell_matrix[i][j] == 0) {
@@ -510,81 +365,47 @@ void solve_sudoku(int runs) {
         }
     }
 
-    int min_cost = N * N * 3;
     int lowest_cost = INT_MAX;
+    Cell cells[N * N];
+    int n = 0;
+    for (int r = 0; r < N; r++) {
+        for (int c = 0; c < subgraphs.rows[r].size; c++) {
+            cells[n] = subgraphs.rows[r].cells[c];
+            n++;
+        }
+    }
 
     for (int run = 0; run < counter; run++) {
-        Cell specific_cell = cell_variations[run];
-        int specific_number = number_variations[run];
-        printf("Run: %d\n", run + 1);
+        printf("Current run: %d\n", run + 1);
         printf("%.2f seconds\n", (double)(clock() - start) / CLOCKS_PER_SEC);
-        printf("(%d,%d) %d\n", specific_cell.row, specific_cell.col, specific_number);
-
-        generate_greedy_tour(tour, specific_cell, specific_number);
-        int cost = two_opt_and_swap(tour);
-
+        printf("(%d,%d) %d\n", cell_variations[run].row, cell_variations[run].col, number_variations[run]);
+        generate_greedy_tour(cell_variations[run], number_variations[run]);
+        int cost = two_opt_and_swap(tour, cells, n);
         if (cost < lowest_cost) {
             lowest_cost = cost;
-            memcpy(best_tour, tour, sizeof(int) * N * N);
         }
-
-        if (cost == min_cost) {
+        if (cost == MIN_COST) {
             break;
         }
     }
 
-    // Print the result
-    printf("Tour: \n");
-    for (int i = 0; i < N; i++) {
-        if (i % SQRT_N == 0 && i != 0) {
-            printf("- - - - - - - - - - - -\n");
-        }
-        for (int j = 0; j < N; j++) {
-            if (j % SQRT_N == 0 && j != 0) {
-                printf("| ");
-            }
-            printf("%d ", best_tour[i][j]);
-        }
-        printf("\n");
-    }
-
-    // Save the solution
-    printf("Saving result...\n");    
-    save_sudoku_file((double)(clock() - start)/ CLOCKS_PER_SEC);
-    printf("Saved.\n"); 
-
-    printf("\nTotal time: %.2f seconds\n", (double)(clock() - start) / CLOCKS_PER_SEC);
+    printf("Saving result...\n");
+    save_sudoku_file((double)(clock() - start) / CLOCKS_PER_SEC);
+    printf("Saved.\n");
+    printf("Total time: %.2f seconds\n", (double)(clock() - start) / CLOCKS_PER_SEC);
     printf("Lowest cost: %d\n", lowest_cost);
 }
 
-// Main function
 int main() {
-    // Read the Sudoku from the file
     parse_sudoku_file(FILEPATH);
-
-    // Initialize numbers
     for (int i = 0; i < N; i++) {
         numbers[i] = i + 1;
     }
-
-    // Generate cell_matrix and subgraphs
     generate_cell_matrix();
     generate_subgraphs();
-
-    // Validate the Sudoku puzzle
-    if (!validate_sudoku(sudoku)) {
+    if (!validate_sudoku()) {
         return 1;
     }
-
-    // Print numbers
-    printf("numbers: ");
-    for (int i = 0; i < N; i++) {
-        printf("%d ", numbers[i]);
-    }
-    printf("\n");
-
-    // Execute optimization
     solve_sudoku(MAX_RUNS);
-
     return 0;
 }

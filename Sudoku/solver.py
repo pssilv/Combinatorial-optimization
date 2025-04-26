@@ -3,7 +3,7 @@ import math
 
 # Global variables
 FILEPATH = "Sudoku_instances/april_5_2025.txt"
-NAME = "sudoku_template"
+NAME = "april_5_2025"
 MAX_RUNS = 250
 
 
@@ -42,22 +42,6 @@ def save_sudoku_file(tour, subgraphs, time):
         f.close()
 
     print(f"Result saved in {filepath}")
-
-
-def generate_sudoku(n):
-    sudoku = []
-    row = []
-
-    for i in range(n):
-        row.append(0)
-
-    for i in range(n):
-        sudoku.append(row)
-
-    for row in sudoku:
-        print(row)
-
-    return sudoku
 
 
 def generate_cell_matrix(sudoku):
@@ -202,12 +186,9 @@ def two_opt(tour, numbers, subgraphs, cell_matrix, cells):
                         if new_global_cost < global_cost:
                             global_cost = new_global_cost
                             improved = True
-                            break
                         else:
                             tour[cell2] = tour[cell1]
                             tour[cell1] = temp
-            if improved:
-                break
 
     return tour, global_cost
 
@@ -238,12 +219,9 @@ def two_opt_reverse(tour, numbers, subgraphs, cell_matrix, cells):
                         if new_global_cost > global_cost:
                             global_cost = new_global_cost
                             improved = True
-                            break
                         else:
                             tour[cell2] = tour[cell1]
                             tour[cell1] = temp
-            if improved:
-                break
 
     return tour
 
@@ -281,10 +259,10 @@ def two_opt_and_swap(initial_tour, numbers, subgraphs, cell_matrix):
                             temp = current_tour[cell1]
                             current_tour[cell1] = current_tour[cell2]
                             current_tour[cell2] = temp
-                            new_tour, new_global_cost = two_opt(current_tour, numbers, subgraphs, cell_matrix, cells)
+                            current_tour, new_global_cost = two_opt(current_tour, numbers, subgraphs, cell_matrix, cells)
 
                             if new_global_cost < global_cost:
-                                best_tour = new_tour
+                                best_tour = current_tour
                                 global_cost = new_global_cost
                                 improved = True
                                 print(global_cost)
@@ -292,6 +270,9 @@ def two_opt_and_swap(initial_tour, numbers, subgraphs, cell_matrix):
                                 if global_cost == min_cost:
                                     print("Found!")
                                     return best_tour, global_cost
+                                break
+            if improved:
+                break
 
     print(best_tour)
     return best_tour, global_cost

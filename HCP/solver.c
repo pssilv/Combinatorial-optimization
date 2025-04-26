@@ -182,11 +182,9 @@ TourResult two_opt_swap(int** distances, const int* initial_tour, int n) {
                         shortest_dist += delta;
                         improved = true;
                         if (shortest_dist == n) goto end;
-                        break;
                     }
                 }
             }
-            if (improved) break;
         }
     }
 end:
@@ -217,17 +215,16 @@ int* two_opt_reverse(int** distances, const int* initial_tour, int n) {
                     best_tour = temp_tour;
                     longest_dist = new_dist;
                     improved = true;
-                    break;
                 } else {
                     free(temp_tour);
                 }
             }
-            if (improved) break;
         }
     }
     return best_tour;
 }
 
+// For decision problems (NP-complete) generating a new local minimum from a pertubed local minimum have better results.
 TourResult two_opt_and_swap(int** distances, const int* initial_tour, int n) {
     int* worsened_tour = two_opt_reverse(distances, initial_tour, n);
     TourResult best = two_opt_swap(distances, worsened_tour, n);
@@ -247,19 +244,21 @@ TourResult two_opt_and_swap(int** distances, const int* initial_tour, int n) {
                     current_tour[i] = current_tour[j];
                     current_tour[j] = temp;
                     TourResult temp_result = two_opt_swap(distances, current_tour, n);
+                    memcpy(current_tour, temp_result.tour, n * sizeof(int));
                     if (temp_result.dist < shortest_dist) {
                         free(best_tour);
                         best_tour = temp_result.tour;
-                        memcpy(current_tour, best_tour, n * sizeof(int));
                         shortest_dist = temp_result.dist;
                         improved = true;
                         printf("2-opt improvement: %d\n", shortest_dist);
                         if (shortest_dist == n) goto end;
+                        break;
                     } else {
                         free(temp_result.tour);
                     }
                 }
             }
+            if (improved) break;
         }
     }
 end:
