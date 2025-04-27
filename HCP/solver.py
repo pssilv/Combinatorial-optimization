@@ -157,10 +157,9 @@ def two_opt_and_swap(processed_distances, initial_tour):
             for j in range(n):
                 if i != j:
                     current_tour[i], current_tour[j] = current_tour[j], current_tour[i]
-                    new_tour, new_dist = two_opt_swap(processed_distances, current_tour)
+                    current_tour, new_dist = two_opt_swap(processed_distances, current_tour)
                     if new_dist < shortest_dist:
-                        best_tour = new_tour
-                        current_tour = best_tour.copy()
+                        best_tour = current_tour
                         shortest_dist = new_dist
                         improved = True
                         print(f"2-opt improvement: {shortest_dist}")
